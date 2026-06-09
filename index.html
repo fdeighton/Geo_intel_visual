@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Executive Prospect Map</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<!-- Type -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ---- Design tokens ---------------------------------------------------
+     Institutional "donor-wall" instrument — deep slate ink, prestige brass
+     accent, cool paper. Serif figures for gravitas, Inter for controls. */
+  :root {
+    --ink:        #1b2433;
+    --ink-soft:   #3a4759;
+    --paper:      #eef1f5;
+    --card:       #ffffff;
+    --line:       #d7dde6;
+    --line-soft:  #e7ebf1;
+    --muted:      #6b7686;
+    --brass:      #b0853f;
+    --brass-deep: #8a6727;
+    --brass-tint: #f3ead9;
+    --teal:       #2f6d6a;
+    --good:       #2f6d4a;
+    --warn:       #9a6b1f;
+    --danger:     #9a3b3b;
+
+    /* prestige ramp: lower -> higher */
+    --t1: #9aa6b4;
+    --t2: #7d97a0;
+    --t3: #5f8a7e;
+    --t4: #9a8240;
+    --t5: #b0853f;
+
+    --r: 10px;
+    --shadow: 0 1px 2px rgba(27,36,51,.06), 0 8px 24px rgba(27,36,51,.07);
+    --shadow-sm: 0 1px 2px rgba(27,36,51,.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    font-size: 14px;
+    line-height: 1.45;
+    display: flex;
+    flex-direction: column;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---- Header ---------------------------------------------------------- */
+  header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 14px 22px;
+    background: var(--ink);
+    color: #f4f6f9;
+    border-bottom: 3px solid var(--brass);
+  }
+  .brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+  .mark {
+    width: 26px; height: 26px; flex: 0 0 auto;
+    align-self: center;
+    border: 1.5px solid var(--brass);
+    border-radius: 50%;
+    display: grid; place-items: center;
+    color: var(--brass);
+  }
+  .mark svg { width: 14px; height: 14px; display: block; }
+  h1 {
+    font-family: "Spectral", Georgia, serif;
+    font-weight: 600;
+    font-size: 20px;
+    letter-spacing: .2px;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .tagline {
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: #9fb0c4;
+    white-space: nowrap;
+  }
+  header .spacer { flex: 1 1 auto; }
+  .source-name {
+    font-size: 12.5px;
+    color: #aebccd;
+    max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* ---- Stats strip ----------------------------------------------------- */
+  .stats {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .stat { background: var(--card); padding: 12px 18px; }
+  .stat .k {
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 3px;
+  }
+  .stat .v {
+    font-family: "Spectral", Georgia, serif;
+    font-weight: 600; font-size: 23px; line-height: 1.1; color: var(--ink);
+  }
+  .stat .sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; min-height: 14px; }
+
+  /* ---- Main layout ----------------------------------------------------- */
+  main {
+    flex: 1 1 auto;
+    display: flex;
+    min-height: 0;
+  }
+  /* Filters rail */
+  .rail {
+    flex: 0 0 256px;
+    background: var(--card);
+    border-right: 1px solid var(--line);
+    padding: 16px 16px 22px;
+    overflow-y: auto;
+  }
+  .rail h2 {
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 12px; font-weight: 700;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 5px;
+  }
+  .field label .out { font-weight: 700; color: var(--brass-deep); font-variant-numeric: tabular-nums; }
+  input[type="text"], select {
+    width: 100%; font: inherit; font-size: 13px;
+    padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+    background: #fbfcfe; color: var(--ink);
+  }
+  input[type="text"]:focus, select:focus {
+    outline: 2px solid var(--brass); outline-offset: -1px; border-color: var(--brass);
+  }
+  input[type="range"] { width: 100%; accent-color: var(--brass); }
+  .reset {
+    width: 100%; margin-top: 4px; font: inherit; font-size: 12.5px; font-weight: 600;
+    color: var(--ink-soft); background: transparent; border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px; cursor: pointer;
+  }
+  .reset:hover { border-color: var(--brass); color: var(--brass-deep); }
+
+  .legend { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
+  .legend .bar {
+    height: 8px; border-radius: 4px; margin: 6px 0 4px;
+    background: linear-gradient(90deg, var(--t1), var(--t2), var(--t3), var(--t4), var(--t5));
+  }
+  .legend .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+  .legend .mgh { display:flex; align-items:center; gap:7px; margin-top:12px; font-size:11.5px; color: var(--muted); }
+  .legend .mgh .dot { width:11px; height:11px; border-radius:50%; background:var(--danger); border:2px solid #fff; box-shadow:0 0 0 1px var(--danger); flex:0 0 auto; }
+
+  /* Map */
+  .map-wrap { flex: 1 1 auto; position: relative; min-width: 0; }
+  #map { position: absolute; inset: 0; background: #dfe6ee; }
+  .leaflet-container { font: inherit; }
+
+  /* Table */
+  .table-wrap {
+    flex: 0 0 460px;
+    background: var(--card);
+    border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .table-head {
+    flex: 0 0 auto; padding: 12px 16px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .table-head .title { font-weight: 700; font-size: 13px; }
+  .table-head .count { color: var(--muted); font-weight: 500; }
+  .table-head .spacer { flex: 1; }
+  .sort-ctl { display: flex; align-items: center; gap: 6px; }
+  .sort-ctl select { width: auto; font-size: 12px; padding: 5px 7px; }
+  .dir {
+    border: 1px solid var(--line); background: #fbfcfe; border-radius: 7px;
+    width: 30px; height: 30px; cursor: pointer; color: var(--ink-soft);
+    display: grid; place-items: center;
+  }
+  .dir:hover { border-color: var(--brass); color: var(--brass-deep); }
+
+  .table-scroll { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    position: sticky; top: 0; z-index: 2; background: var(--card);
+    text-align: left; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; padding: 9px 10px;
+    border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  thead th.sortable { cursor: pointer; }
+  thead th.sortable:hover { color: var(--brass-deep); }
+  thead th.r, td.r { text-align: right; }
+  tbody td { padding: 9px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: #f7f9fc; }
+  tbody tr.sel { background: var(--brass-tint); }
+  tbody tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--brass); }
+  tbody tr.nocoord { cursor: default; }
+  tbody tr.nocoord:hover { background: transparent; }
+  .nm { font-weight: 600; color: var(--ink); }
+  .sub2 { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .nogeo { font-size: 10px; color: var(--danger); font-weight: 600; }
+
+  .badge {
+    display: inline-block; min-width: 30px; text-align: center;
+    padding: 2px 7px; border-radius: 999px; font-size: 12px; font-weight: 700;
+    font-variant-numeric: tabular-nums; color: #fff;
+  }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 600;
+    background: #eef1f5; color: var(--ink-soft); white-space: nowrap;
+  }
+  .pill.w-vhigh { background: #ece3d2; color: var(--brass-deep); }
+  .pill.w-high  { background: #e9efe9; color: var(--good); }
+  .pill.w-med   { background: #f6eed9; color: var(--warn); }
+
+  /* Popup profile card */
+  .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: var(--shadow); padding: 0; }
+  .leaflet-popup-content { margin: 0; width: 300px !important; }
+  .leaflet-popup-tip { box-shadow: var(--shadow-sm); }
+  .card .top {
+    padding: 14px 16px 12px; border-bottom: 1px solid var(--line-soft);
+    background: linear-gradient(180deg, #fbfaf6, #fff);
+    border-radius: 12px 12px 0 0;
+  }
+  .card .nm-lg { font-family: "Spectral", Georgia, serif; font-size: 18px; font-weight: 600; color: var(--ink); }
+  .card .rc { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+  .card .rc b { color: var(--ink); font-weight: 600; }
+  .card .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    padding: 4px 0; border-bottom: 1px solid var(--line-soft);
+  }
+  .card .grid:last-child { border-bottom: none; border-radius: 0 0 12px 12px; }
+  .card .cell { padding: 9px 16px; }
+  .card .cell.full { grid-column: 1 / -1; }
+  .card .cell .ck { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .card .cell .cv { font-size: 14px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 1px; }
+  .card .notes { padding: 11px 16px 14px; font-size: 12.5px; color: var(--ink-soft); }
+  .card .notes .ck { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display:block; margin-bottom: 3px; }
+
+  /* Loading / overlay state */
+  .empty {
+    position: absolute; inset: 0; z-index: 500;
+    display: grid; place-items: center; padding: 24px;
+    background: var(--paper);
+  }
+  .empty.hidden { display: none; }
+  .empty .box {
+    max-width: 420px; text-align: center; background: var(--card);
+    border: 1px solid var(--line); border-radius: 14px; padding: 30px 28px;
+    box-shadow: var(--shadow);
+  }
+  .empty .ic { color: var(--brass); margin-bottom: 10px; }
+  .empty h3 { font-family: "Spectral", Georgia, serif; font-weight: 600; font-size: 20px; margin: 0 0 6px; }
+  .empty p { color: var(--muted); margin: 0; font-size: 13.5px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px;
+    font-size: 13px; box-shadow: var(--shadow); z-index: 1000; max-width: 80vw;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { background: var(--danger); }
+
+  /* Responsive */
+  @media (max-width: 1080px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    main { flex-direction: column; }
+    .rail { flex: 0 0 auto; border-right: none; border-bottom: 1px solid var(--line); }
+    .map-wrap { flex: 0 0 52vh; }
+    .table-wrap { flex: 1 1 auto; border-left: none; border-top: 1px solid var(--line); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+    </span>
+    <h1>Executive Prospect Map</h1>
+    <span class="tagline">Geographic prospect intelligence</span>
+  </div>
+  <div class="spacer"></div>
+  <span class="source-name" id="sourceName"></span>
+</header>
+
+<section class="stats" id="stats" aria-label="Summary statistics">
+  <div class="stat"><div class="k">Prospects shown</div><div class="v num" id="stTotal">—</div><div class="sub" id="stTotalSub"></div></div>
+  <div class="stat"><div class="k">Median sale price</div><div class="v num" id="stMedian">—</div><div class="sub" id="stMedianSub"></div></div>
+  <div class="stat"><div class="k">Top donor category</div><div class="v" id="stCat" style="font-size:18px">—</div><div class="sub" id="stCatSub"></div></div>
+  <div class="stat"><div class="k">Very-high wealth</div><div class="v num" id="stWealth">—</div><div class="sub" id="stWealthSub"></div></div>
+</section>
+
+<main>
+  <aside class="rail" aria-label="Filters">
+    <h2>Filters</h2>
+    <div class="field">
+      <label for="fName">Name / company</label>
+      <input type="text" id="fName" placeholder="Search…" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="fCategory">Donor category</label>
+      <select id="fCategory"><option value="">All categories</option></select>
+    </div>
+    <div class="field">
+      <label for="fTier">Seniority tier</label>
+      <select id="fTier"><option value="">All tiers</option></select>
+    </div>
+    <div class="field">
+      <label for="fWealth">Wealth signal</label>
+      <select id="fWealth"><option value="">All signals</option></select>
+    </div>
+    <div class="field">
+      <label for="fPrice">Min. sale price <span class="out num" id="fPriceOut">$0</span></label>
+      <input type="range" id="fPrice" min="0" max="100" step="1" value="0" />
+    </div>
+    <div class="field">
+      <label for="fPrestige">Min. prestige <span class="out num" id="fPrestigeOut">0</span></label>
+      <input type="range" id="fPrestige" min="0" max="100" step="1" value="0" />
+    </div>
+    <button class="reset" id="resetBtn" type="button">Reset filters</button>
+
+    <div class="legend">
+      <h2 style="margin-bottom:6px">Pin color — prestige score</h2>
+      <div class="bar"></div>
+      <div class="ends"><span>Lower</span><span>Higher</span></div>
+      <div class="mgh"><span class="dot"></span> Michael Garron Hospital (distance ref.)</div>
+    </div>
+  </aside>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="empty" id="empty">
+      <div class="box">
+        <div class="ic"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Z"/><path d="M9 3v15M15 6v15"/></svg></div>
+        <h3 id="emptyTitle">Loading prospects…</h3>
+        <p id="emptyMsg">Reading the baked executive list.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-head">
+      <span class="title">Prospects <span class="count" id="tblCount"></span></span>
+      <span class="spacer"></span>
+      <div class="sort-ctl">
+        <select id="sortField" aria-label="Sort by">
+          <option value="prestige">Prestige</option>
+          <option value="salePrice">Sale price</option>
+          <option value="distanceMGH">Distance to MGH</option>
+          <option value="name">Name</option>
+        </select>
+        <button class="dir" id="sortDir" type="button" title="Toggle sort direction" aria-label="Toggle sort direction">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0l5-5m-5 5l-5-5"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Prospect</th>
+            <th>Wealth</th>
+            <th class="r sortable" data-sort="salePrice">Price</th>
+            <th class="r sortable" data-sort="prestige">Prst</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
