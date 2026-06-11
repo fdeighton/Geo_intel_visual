@@ -53,6 +53,17 @@
     }).addTo(map);
     markerLayer = L.layerGroup().addTo(map);
 
+    // When a prospect's card closes, return its marker to the normal style.
+    // The deferred check tells "closed the card" apart from "switched to
+    // another prospect" — switching opens a new popup in the same tick, so
+    // popupOpen is true again by the time the timeout runs and we leave it.
+    var popupOpen = false;
+    map.on("popupopen", function () { popupOpen = true; });
+    map.on("popupclose", function () {
+      popupOpen = false;
+      setTimeout(function () { if (!popupOpen) deselect(); }, 0);
+    });
+
     mghMarker = L.circleMarker([MGH.lat, MGH.lng], {
       radius: 9, color: "#fff", weight: 2.5, fillColor: "#9a3b3b", fillOpacity: 1
     }).bindTooltip(MGH.name, { direction: "top", offset: [0, -6] }).addTo(map);
@@ -266,9 +277,13 @@
     els.stMedian.textContent = med == null ? "—" : fmtMoneyShort(med);
     els.stMedianSub.textContent = prices.length ? "across " + prices.length + " sales" : "no price data";
 
+    // Top donor category, skipping the catch-all "Other" so the stat names a
+    // real industry. Falls through to the next-leading category.
     var counts = {};
     filtered.forEach(function (r) { if (r.category) counts[r.category] = (counts[r.category] || 0) + 1; });
-    var top = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; })[0];
+    var top = Object.keys(counts)
+      .filter(function (c) { return c.trim().toLowerCase() !== "other"; })
+      .sort(function (a, b) { return counts[b] - counts[a]; })[0];
     if (top) { els.stCat.textContent = top; els.stCatSub.textContent = counts[top] + " prospect" + (counts[top] === 1 ? "" : "s"); }
     else { els.stCat.textContent = "—"; els.stCatSub.textContent = ""; }
 
@@ -297,6 +312,18 @@
     if (tr) tr.scrollIntoView({ block: "nearest", behavior: fromTable ? "smooth" : "auto" });
   }
 
+  // Clear the current selection: shrink every marker back to normal and drop
+  // the highlighted table row. Called when a prospect's card is dismissed.
+  function deselect() {
+    selectedId = null;
+    Object.keys(markersById).forEach(function (mid) {
+      markersById[mid].setStyle({ radius: 6.5, color: "#ffffff", weight: 1.5 });
+    });
+    Array.prototype.forEach.call(els.tbody.querySelectorAll("tr.sel"), function (tr) {
+      tr.classList.remove("sel");
+    });
+  }
+
   // ---- Toast ------------------------------------------------------------
   var toastTimer;
   function toast(msg, isErr) {
@@ -311,13 +338,27 @@
   var rerender = function () { render(false); };
   var rerenderDeb = debounce(rerender, 160);
 
+  // Frame-throttled render for sliders. Unlike a debounce, a continuous drag
+  // can't starve it — at most one render is queued per animation frame, so the
+  // map/list update live and smoothly while you drag.
+  var rafPending = false;
+  function rerenderRAF() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(function () { rafPending = false; render(false); });
+  }
+
   function wire() {
     els.fName.addEventListener("input", rerenderDeb);
     els.fCategory.addEventListener("change", rerender);
     els.fTier.addEventListener("change", rerender);
     els.fWealth.addEventListener("change", rerender);
-    els.fPrice.addEventListener("input", function () { els.fPriceOut.textContent = fmtMoneyShort(parseFloat(els.fPrice.value) || 0); rerenderDeb(); });
-    els.fPrestige.addEventListener("input", function () { els.fPrestigeOut.textContent = els.fPrestige.value; rerenderDeb(); });
+    // Sliders: instant label on every move, live frame-throttled filtering
+    // while dragging, and a guaranteed final render on release (change).
+    els.fPrice.addEventListener("input", function () { els.fPriceOut.textContent = fmtMoneyShort(parseFloat(els.fPrice.value) || 0); rerenderRAF(); });
+    els.fPrice.addEventListener("change", rerender);
+    els.fPrestige.addEventListener("input", function () { els.fPrestigeOut.textContent = els.fPrestige.value; rerenderRAF(); });
+    els.fPrestige.addEventListener("change", rerender);
 
     els.resetBtn.addEventListener("click", function () {
       els.fName.value = ""; els.fCategory.value = ""; els.fTier.value = ""; els.fWealth.value = "";
