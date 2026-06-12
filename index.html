@@ -11,6 +11,9 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
+<!-- Excel export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <!-- Type -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -104,6 +107,17 @@
     color: #aebccd;
     max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .btn {
+    font: inherit; font-weight: 600; font-size: 13px;
+    border-radius: 8px; border: 1px solid var(--brass);
+    background: var(--brass); color: #fff;
+    padding: 8px 13px; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: background .15s, border-color .15s, opacity .15s;
+  }
+  .btn:hover { background: var(--brass-deep); border-color: var(--brass-deep); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn svg { width: 15px; height: 15px; }
 
   /* ---- Stats strip ----------------------------------------------------- */
   .stats {
@@ -309,6 +323,10 @@
   </div>
   <div class="spacer"></div>
   <span class="source-name" id="sourceName"></span>
+  <button class="btn" id="exportBtn" type="button" title="Download the currently filtered prospects as an Excel file">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l4-4m-4 4l-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    <span id="exportLabel">Export Excel</span>
+  </button>
 </header>
 
 <section class="stats" id="stats" aria-label="Summary statistics">

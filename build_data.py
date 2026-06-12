@@ -170,6 +170,48 @@ def as_num(row, i):
         return None
 
 
+# ---- wealth signal: blend of sale-price tier and prestige tier -------------
+# The source "Wealth Signal" column is just a relabeling of the prestige score
+# (role-based), so it ignores the home's value. We recompute it as a blend so
+# both the property and the person's seniority count.
+WEALTH_LABELS = {1: "Low", 2: "Medium", 3: "High", 4: "Very High"}
+
+
+def _price_tier(p):
+    if p is None:
+        return None
+    if p >= 5_000_000:
+        return 4
+    if p >= 3_500_000:
+        return 3
+    if p >= 2_000_000:
+        return 2
+    return 1
+
+
+def _prestige_tier(p):
+    if p is None:
+        return None
+    if p >= 90:
+        return 4
+    if p >= 80:
+        return 3
+    if p >= 60:
+        return 2
+    return 1
+
+
+def wealth_signal(price, prestige):
+    tiers = [t for t in (_price_tier(price), _prestige_tier(prestige)) if t is not None]
+    if not tiers:
+        return ""  # neither price nor prestige available
+    avg = sum(tiers) / len(tiers)
+    # Round to nearest tier; a .5 tie rounds DOWN (e.g. Very-High home + junior
+    # role = (4+1)/2 = 2.5 -> Medium), avoiding banker's-rounding surprises.
+    tier = int(avg - 0.5) if avg % 1 == 0.5 else round(avg)
+    return WEALTH_LABELS[max(1, min(4, tier))]
+
+
 # ---- main ------------------------------------------------------------------
 src = pick_source()
 print("Reading", os.path.basename(src))
@@ -195,17 +237,19 @@ for r in data:
         continue
     addr = as_text(r, cols.get("address"))
     coord = cache.get(addr) if addr else None
+    sale_price = as_num(r, cols.get("salePrice"))
+    prestige = as_num(r, cols.get("prestige"))
     records.append({
         "name": name,
         "role": as_text(r, cols.get("role")),
         "company": as_text(r, cols.get("company")),
         "address": addr,
-        "salePrice": as_num(r, cols.get("salePrice")),
+        "salePrice": sale_price,
         "saleDate": as_text(r, cols.get("saleDate")),
         "distanceMGH": as_num(r, cols.get("distanceMGH")),
-        "prestige": as_num(r, cols.get("prestige")),
+        "prestige": prestige,
         "tier": as_text(r, cols.get("tier")),
-        "wealth": as_text(r, cols.get("wealth")),
+        "wealth": wealth_signal(sale_price, prestige),
         "category": as_text(r, cols.get("category")),
         "notes": as_text(r, cols.get("notes")),
         "lat": coord[0] if coord else None,

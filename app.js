@@ -21,7 +21,7 @@
   ["sourceName","fName","fCategory","fTier","fWealth","fPrice","fPriceOut",
    "fPrestige","fPrestigeOut","resetBtn","sortField","sortDir","tbody","tblCount",
    "stTotal","stTotalSub","stMedian","stMedianSub","stCat","stCatSub","stWealth","stWealthSub",
-   "toast","empty","emptyTitle","emptyMsg"
+   "toast","empty","emptyTitle","emptyMsg","exportBtn","exportLabel"
   ].forEach(function (id) { els[id] = document.getElementById(id); });
 
   // ---- Helpers ----------------------------------------------------------
@@ -324,6 +324,52 @@
     });
   }
 
+  // ---- Excel export -----------------------------------------------------
+  // Columns mirror the source workbook (Role Sorted sheet), in the same order
+  // and with the same header text, so the export drops in like the original.
+  var EXPORT_COLUMNS = [
+    ["Name", "name"],
+    ["Role", "role"],
+    ["Company", "company"],
+    ["Property Address", "address"],
+    ["Sale Price", "salePrice"],
+    ["Sale Date", "saleDate"],
+    ["Distance to MGH (km)", "distanceMGH"],
+    ["Prestige Score (0-100)", "prestige"],
+    ["Seniority Tier", "tier"],
+    ["Wealth Signal", "wealth"],
+    ["Donor Category", "category"],
+    ["Notes", "notes"]
+  ];
+
+  function exportExcel() {
+    if (typeof XLSX === "undefined") {
+      toast("Excel library didn't load — check your connection and retry.", true);
+      return;
+    }
+    var list = sortRecords(applyFilters()); // exactly what the table shows
+    if (!list.length) { toast("No prospects match the filters — nothing to export.", true); return; }
+
+    var aoa = [EXPORT_COLUMNS.map(function (c) { return c[0]; })];
+    list.forEach(function (r) {
+      aoa.push(EXPORT_COLUMNS.map(function (c) {
+        var v = r[c[1]];
+        return (v === null || v === undefined) ? "" : v;
+      }));
+    });
+
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [22, 24, 26, 30, 12, 12, 18, 20, 18, 14, 16, 32].map(function (w) { return { wch: w }; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Prospects");
+
+    var d = new Date();
+    var stamp = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+    var base = ((window.PROSPECT_META && window.PROSPECT_META.source) || "prospects").replace(/\.[^.]+$/, "");
+    XLSX.writeFile(wb, base + "_filtered_" + list.length + "_" + stamp + ".xlsx");
+    toast("Exported " + list.length + " prospect" + (list.length === 1 ? "" : "s") + " to Excel.");
+  }
+
   // ---- Toast ------------------------------------------------------------
   var toastTimer;
   function toast(msg, isErr) {
@@ -349,6 +395,7 @@
   }
 
   function wire() {
+    els.exportBtn.addEventListener("click", exportExcel);
     els.fName.addEventListener("input", rerenderDeb);
     els.fCategory.addEventListener("change", rerender);
     els.fTier.addEventListener("change", rerender);
